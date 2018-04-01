@@ -68,13 +68,13 @@ void Integrate(float * cam_K, float * cam2base, float * depth_im,
 int main(int argc, char * argv[]) {
 
   // Location of camera intrinsic file
-  std::string cam_K_file = "data/camera-intrinsics.txt";
+  std::string cam_K_file = "spartan_data/camera-intrinsics.txt";
 
   // Location of folder containing RGB-D frames and camera pose files
-  std::string data_path = "data/rgbd-frames";
-  int base_frame_idx = 150;
-  int first_frame_idx = 150;
-  float num_frames = 50;
+  std::string data_path = "spartan_data/fusion1519825352.8/images";
+  int base_frame_idx = 0;
+  int first_frame_idx = 0;
+  float num_frames = 2553;
 
   float cam_K[3 * 3];
   float base2world[4 * 4];
@@ -115,7 +115,7 @@ int main(int argc, char * argv[]) {
   // Read base frame camera pose
   std::ostringstream base_frame_prefix;
   base_frame_prefix << std::setw(6) << std::setfill('0') << base_frame_idx;
-  std::string base2world_file = data_path + "/frame-" + base_frame_prefix.str() + ".pose.txt";
+  std::string base2world_file = data_path + "/" + base_frame_prefix.str() + "_pose.txt";
   std::vector<float> base2world_vec = LoadMatrixFromFile(base2world_file, 4, 4);
   std::copy(base2world_vec.begin(), base2world_vec.end(), base2world);
 
@@ -155,11 +155,11 @@ int main(int argc, char * argv[]) {
     curr_frame_prefix << std::setw(6) << std::setfill('0') << frame_idx;
 
     // // Read current frame depth
-    std::string depth_im_file = data_path + "/frame-" + curr_frame_prefix.str() + ".depth.png";
+    std::string depth_im_file = data_path + "/" + curr_frame_prefix.str() + "_depth.png";
     ReadDepth(depth_im_file, im_height, im_width, depth_im);
 
     // Read base frame camera pose
-    std::string cam2world_file = data_path + "/frame-" + curr_frame_prefix.str() + ".pose.txt";
+    std::string cam2world_file = data_path + "/" + curr_frame_prefix.str() + "_pose.txt";
     std::vector<float> cam2world_vec = LoadMatrixFromFile(cam2world_file, 4, 4);
     std::copy(cam2world_vec.begin(), cam2world_vec.end(), cam2world);
 
