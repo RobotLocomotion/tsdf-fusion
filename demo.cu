@@ -85,14 +85,14 @@ int main(int argc, char * argv[]) {
   float depth_im[im_height * im_width];
 
   // Voxel grid parameters (change these to change voxel grid resolution, etc.)
-  float voxel_grid_origin_x = -1.5f; // Location of voxel grid origin in base frame camera coordinates
-  float voxel_grid_origin_y = -1.5f;
+  float voxel_grid_origin_x = -0.5f; // Location of voxel grid origin in base frame camera coordinates
+  float voxel_grid_origin_y = -0.5f;
   float voxel_grid_origin_z = 0.5f;
-  float voxel_size = 0.006f;
+  float voxel_size = 0.001f;
   float trunc_margin = voxel_size * 5;
-  int voxel_grid_dim_x = 500;
-  int voxel_grid_dim_y = 500;
-  int voxel_grid_dim_z = 500;
+  int voxel_grid_dim_x = 1000;
+  int voxel_grid_dim_y = 1000;
+  int voxel_grid_dim_z = 1000;
 
   // Manual parameters
   if (argc > 1) {
