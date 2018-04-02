@@ -67,11 +67,16 @@ void Integrate(float * cam_K, float * cam2base, float * depth_im,
 // Volume is aligned with respect to the camera coordinates of the first frame (a.k.a. base frame)
 int main(int argc, char * argv[]) {
 
-  // Location of camera intrinsic file
-  std::string cam_K_file = "spartan_data/camera-intrinsics.txt";
-
+  std::cout << "running tsdf fusion " << std::endl;
+  
   // Location of folder containing RGB-D frames and camera pose files
-  std::string data_path = "spartan_data/fusion1519825352.8/images";
+  std::string data_path;
+
+  // location of camera intrinsics file
+  std::string cam_K_file;
+
+  
+
   int base_frame_idx = 0;
   int first_frame_idx = 0;
   float num_frames = 2553;
@@ -85,19 +90,25 @@ int main(int argc, char * argv[]) {
   float depth_im[im_height * im_width];
 
   // Voxel grid parameters (change these to change voxel grid resolution, etc.)
-  float voxel_grid_origin_x = -0.5f; // Location of voxel grid origin in base frame camera coordinates
-  float voxel_grid_origin_y = -0.5f;
-  float voxel_grid_origin_z = 0.5f;
-  float voxel_size = 0.001f;
+  float voxel_grid_origin_x = 0.4f; // Location of voxel grid origin in base frame camera coordinates
+  float voxel_grid_origin_y = -0.3f;
+  float voxel_grid_origin_z = -0.2f;
+  float voxel_size = 0.002f;
   float trunc_margin = voxel_size * 5;
-  int voxel_grid_dim_x = 1000;
-  int voxel_grid_dim_y = 1000;
-  int voxel_grid_dim_z = 1000;
+  int voxel_grid_dim_x = 500;
+  int voxel_grid_dim_y = 500;
+  int voxel_grid_dim_z = 500;
 
   // Manual parameters
   if (argc > 1) {
-    cam_K_file = argv[1];
-    data_path = argv[2];
+    std::cout << "parsing data path\n";
+    std::cout << "argc " << argc << std::endl;
+    data_path = argv[1];
+    cam_K_file = argv[2];
+  }
+
+  if (argc > 3){
+    std::cout << "parsing additional parameters\n";
     base_frame_idx = atoi(argv[3]);
     first_frame_idx = atoi(argv[4]);
     num_frames = atof(argv[5]);
@@ -107,6 +118,8 @@ int main(int argc, char * argv[]) {
     voxel_size = atof(argv[9]);
     trunc_margin = atof(argv[10]);
   }
+
+  std::cout << "data_path "<< data_path << std::endl;
 
   // Read camera intrinsics
   std::vector<float> cam_K_vec = LoadMatrixFromFile(cam_K_file, 3, 3);
@@ -118,6 +131,22 @@ int main(int argc, char * argv[]) {
   std::string base2world_file = data_path + "/" + base_frame_prefix.str() + "_pose.txt";
   std::vector<float> base2world_vec = LoadMatrixFromFile(base2world_file, 4, 4);
   std::copy(base2world_vec.begin(), base2world_vec.end(), base2world);
+
+  // set base2world to be the identity
+  for(int i = 0; i < 16; i++){
+    base2world[i] = 0;
+  }
+
+  base2world[0] = 1;
+  base2world[5] = 1;
+  base2world[10] = 1;
+  base2world[15] = 1;
+
+
+  for(int i = 0; i < 16; i++){
+    std::cout << "base2world  " << i << " = " << base2world[i] << std::endl;
+  }
+  
 
   // Invert base frame camera pose to get world-to-base frame transform 
   float base2world_inv[16] = {0};
@@ -149,19 +178,29 @@ int main(int argc, char * argv[]) {
   checkCUDA(__LINE__, cudaGetLastError());
 
   // Loop through each depth frame and integrate TSDF voxel grid
-  for (int frame_idx = first_frame_idx; frame_idx < first_frame_idx + (int)num_frames; ++frame_idx) {
-
+  int frame_idx = 0;
+  while(true){
     std::ostringstream curr_frame_prefix;
     curr_frame_prefix << std::setw(6) << std::setfill('0') << frame_idx;
+
+
+    // Read base frame camera pose
+    std::string cam2world_file = data_path + "/" + curr_frame_prefix.str() + "_pose.txt";
+
+    // check if file exists, if not return
+    std::ifstream ifile(cam2world_file);
+    if (ifile.fail()) {
+      // The file doesn't exist, break out of while loop
+      break;
+    }
+    std::vector<float> cam2world_vec = LoadMatrixFromFile(cam2world_file, 4, 4);
+    std::copy(cam2world_vec.begin(), cam2world_vec.end(), cam2world);
 
     // // Read current frame depth
     std::string depth_im_file = data_path + "/" + curr_frame_prefix.str() + "_depth.png";
     ReadDepth(depth_im_file, im_height, im_width, depth_im);
 
-    // Read base frame camera pose
-    std::string cam2world_file = data_path + "/" + curr_frame_prefix.str() + "_pose.txt";
-    std::vector<float> cam2world_vec = LoadMatrixFromFile(cam2world_file, 4, 4);
-    std::copy(cam2world_vec.begin(), cam2world_vec.end(), cam2world);
+    
 
     // Compute relative camera pose (camera-to-base frame)
     multiply_matrix(base2world_inv, cam2world, cam2base);
@@ -176,23 +215,60 @@ int main(int argc, char * argv[]) {
                                                          im_height, im_width, voxel_grid_dim_x, voxel_grid_dim_y, voxel_grid_dim_z,
                                                          voxel_grid_origin_x, voxel_grid_origin_y, voxel_grid_origin_z, voxel_size, trunc_margin,
                                                          gpu_voxel_grid_TSDF, gpu_voxel_grid_weight);
+
+    frame_idx++;
+
   }
+  // for (int frame_idx = first_frame_idx; frame_idx < first_frame_idx + (int)num_frames; ++frame_idx) {
+
+  //   std::ostringstream curr_frame_prefix;
+  //   curr_frame_prefix << std::setw(6) << std::setfill('0') << frame_idx;
+
+  //   // // Read current frame depth
+  //   std::string depth_im_file = data_path + "/" + curr_frame_prefix.str() + "_depth.png";
+  //   ReadDepth(depth_im_file, im_height, im_width, depth_im);
+
+  //   // Read base frame camera pose
+  //   std::string cam2world_file = data_path + "/" + curr_frame_prefix.str() + "_pose.txt";
+  //   std::vector<float> cam2world_vec = LoadMatrixFromFile(cam2world_file, 4, 4);
+  //   std::copy(cam2world_vec.begin(), cam2world_vec.end(), cam2world);
+
+  //   // Compute relative camera pose (camera-to-base frame)
+  //   multiply_matrix(base2world_inv, cam2world, cam2base);
+
+  //   cudaMemcpy(gpu_cam2base, cam2base, 4 * 4 * sizeof(float), cudaMemcpyHostToDevice);
+  //   cudaMemcpy(gpu_depth_im, depth_im, im_height * im_width * sizeof(float), cudaMemcpyHostToDevice);
+  //   checkCUDA(__LINE__, cudaGetLastError());
+
+  //   std::cout << "Fusing: " << depth_im_file << std::endl;
+
+  //   Integrate <<< voxel_grid_dim_z, voxel_grid_dim_y >>>(gpu_cam_K, gpu_cam2base, gpu_depth_im,
+  //                                                        im_height, im_width, voxel_grid_dim_x, voxel_grid_dim_y, voxel_grid_dim_z,
+  //                                                        voxel_grid_origin_x, voxel_grid_origin_y, voxel_grid_origin_z, voxel_size, trunc_margin,
+  //                                                        gpu_voxel_grid_TSDF, gpu_voxel_grid_weight);
+  // }
 
   // Load TSDF voxel grid from GPU to CPU memory
   cudaMemcpy(voxel_grid_TSDF, gpu_voxel_grid_TSDF, voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z * sizeof(float), cudaMemcpyDeviceToHost);
   cudaMemcpy(voxel_grid_weight, gpu_voxel_grid_weight, voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z * sizeof(float), cudaMemcpyDeviceToHost);
   checkCUDA(__LINE__, cudaGetLastError());
 
+
+
+  std::string tsdf_ply_filename = data_path + "/tsdf.ply";
+  std::string tsdf_bin_filename = data_path + "/tsdf.bin";
+
   // Compute surface points from TSDF voxel grid and save to point cloud .ply file
   std::cout << "Saving surface point cloud (tsdf.ply)..." << std::endl;
-  SaveVoxelGrid2SurfacePointCloud("tsdf.ply", voxel_grid_dim_x, voxel_grid_dim_y, voxel_grid_dim_z, 
+  std::cout << "tsdf_bin_filename " << tsdf_bin_filename << std::endl;
+
+  SaveVoxelGrid2SurfacePointCloud(tsdf_ply_filename, voxel_grid_dim_x, voxel_grid_dim_y, voxel_grid_dim_z, 
                                   voxel_size, voxel_grid_origin_x, voxel_grid_origin_y, voxel_grid_origin_z,
                                   voxel_grid_TSDF, voxel_grid_weight, 0.2f, 0.0f);
 
   // Save TSDF voxel grid and its parameters to disk as binary file (float array)
   std::cout << "Saving TSDF voxel grid values to disk (tsdf.bin)..." << std::endl;
-  std::string voxel_grid_saveto_path = "tsdf.bin";
-  std::ofstream outFile(voxel_grid_saveto_path, std::ios::binary | std::ios::out);
+  std::ofstream outFile(tsdf_bin_filename, std::ios::binary | std::ios::out);
   float voxel_grid_dim_xf = (float) voxel_grid_dim_x;
   float voxel_grid_dim_yf = (float) voxel_grid_dim_y;
   float voxel_grid_dim_zf = (float) voxel_grid_dim_z;
