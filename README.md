@@ -33,6 +33,19 @@ This demo fuses 50 registered depth maps from directory `data/rgbd-frames` into 
 tsdf2mesh; % 3D mesh saved to mesh.ply
 ```
 
+## Usage in Spartan
+ The executable `demo` accepts two command line arguments. The first is the full path to the the folder where the depth images are stored, the second is the path to the `camera-intrinsics.txt` file. The images folders structure should be
+ 
+ ```
+ images
+  -- 000001_depth.png
+  -- 000001_pose.txt
+  .
+  .
+ ```
+ 
+ The executable outputs two files, `tsdf.bin` and `tsdf_pointcloud.ply`, both in the `images` folder that was passed in. `tsdf.bin` is a binary file containing the actual TSDF, can be converted to a mesh using code in `spartan`. `tsdf_pointcloud.ply` is a pointcloud sampled from the TSDF implicit surface and encoded as a ply file.
+
 ## Seen in
  * [3DMatch: Learning Local Geometric Descriptors from RGB-D Reconstructions (CVPR 2017)](http://3dmatch.cs.princeton.edu/)
  * [Semantic Scene Completion from a Single Depth Image (CVPR 2017)](http://sscnet.cs.princeton.edu/)
