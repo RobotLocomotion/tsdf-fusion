@@ -75,11 +75,6 @@ int main(int argc, char * argv[]) {
   // location of camera intrinsics file
   std::string cam_K_file;
 
-  
-
-  int base_frame_idx = 0;
-  int first_frame_idx = 0;
-  float num_frames = 2553;
 
   float cam_K[3 * 3];
   float base2world[4 * 4];
@@ -109,28 +104,40 @@ int main(int argc, char * argv[]) {
 
   if (argc > 3){
     std::cout << "parsing additional parameters\n";
-    base_frame_idx = atoi(argv[3]);
-    first_frame_idx = atoi(argv[4]);
-    num_frames = atof(argv[5]);
-    voxel_grid_origin_x = atof(argv[6]);
-    voxel_grid_origin_y = atof(argv[7]);
-    voxel_grid_origin_z = atof(argv[8]);
-    voxel_size = atof(argv[9]);
-    trunc_margin = atof(argv[10]);
+    int counter = 3;
+
+    voxel_size = atof(argv[counter]);
+    counter++;
+
+    voxel_grid_dim_x = std::atoi(argv[counter]);
+    counter++;
+
+    voxel_grid_dim_y = std::atoi(argv[counter]);
+    counter++;
+
+    voxel_grid_dim_z = std::atoi(argv[counter]);
+    counter++;
+
+    voxel_grid_origin_x = std::atof(argv[counter]);
+    counter++;
+
+    voxel_grid_origin_y = std::atof(argv[counter]);
+    counter++;
+
+    voxel_grid_origin_z = std::atof(argv[counter]);
+    counter++;
+
+    std::cout << "finished parsing params\n";
+
   }
+
+  trunc_margin = 5 * voxel_size;
 
   std::cout << "data_path "<< data_path << std::endl;
 
   // Read camera intrinsics
   std::vector<float> cam_K_vec = LoadMatrixFromFile(cam_K_file, 3, 3);
   std::copy(cam_K_vec.begin(), cam_K_vec.end(), cam_K);
-
-  // Read base frame camera pose
-  std::ostringstream base_frame_prefix;
-  base_frame_prefix << std::setw(6) << std::setfill('0') << base_frame_idx;
-  std::string base2world_file = data_path + "/" + base_frame_prefix.str() + "_pose.txt";
-  std::vector<float> base2world_vec = LoadMatrixFromFile(base2world_file, 4, 4);
-  std::copy(base2world_vec.begin(), base2world_vec.end(), base2world);
 
   // set base2world to be the identity
   for(int i = 0; i < 16; i++){
@@ -143,9 +150,9 @@ int main(int argc, char * argv[]) {
   base2world[15] = 1;
 
 
-  for(int i = 0; i < 16; i++){
-    std::cout << "base2world  " << i << " = " << base2world[i] << std::endl;
-  }
+  // for(int i = 0; i < 16; i++){
+  //   std::cout << "base2world  " << i << " = " << base2world[i] << std::endl;
+  // }
   
 
   // Invert base frame camera pose to get world-to-base frame transform 
@@ -219,34 +226,6 @@ int main(int argc, char * argv[]) {
     frame_idx++;
 
   }
-  // for (int frame_idx = first_frame_idx; frame_idx < first_frame_idx + (int)num_frames; ++frame_idx) {
-
-  //   std::ostringstream curr_frame_prefix;
-  //   curr_frame_prefix << std::setw(6) << std::setfill('0') << frame_idx;
-
-  //   // // Read current frame depth
-  //   std::string depth_im_file = data_path + "/" + curr_frame_prefix.str() + "_depth.png";
-  //   ReadDepth(depth_im_file, im_height, im_width, depth_im);
-
-  //   // Read base frame camera pose
-  //   std::string cam2world_file = data_path + "/" + curr_frame_prefix.str() + "_pose.txt";
-  //   std::vector<float> cam2world_vec = LoadMatrixFromFile(cam2world_file, 4, 4);
-  //   std::copy(cam2world_vec.begin(), cam2world_vec.end(), cam2world);
-
-  //   // Compute relative camera pose (camera-to-base frame)
-  //   multiply_matrix(base2world_inv, cam2world, cam2base);
-
-  //   cudaMemcpy(gpu_cam2base, cam2base, 4 * 4 * sizeof(float), cudaMemcpyHostToDevice);
-  //   cudaMemcpy(gpu_depth_im, depth_im, im_height * im_width * sizeof(float), cudaMemcpyHostToDevice);
-  //   checkCUDA(__LINE__, cudaGetLastError());
-
-  //   std::cout << "Fusing: " << depth_im_file << std::endl;
-
-  //   Integrate <<< voxel_grid_dim_z, voxel_grid_dim_y >>>(gpu_cam_K, gpu_cam2base, gpu_depth_im,
-  //                                                        im_height, im_width, voxel_grid_dim_x, voxel_grid_dim_y, voxel_grid_dim_z,
-  //                                                        voxel_grid_origin_x, voxel_grid_origin_y, voxel_grid_origin_z, voxel_size, trunc_margin,
-  //                                                        gpu_voxel_grid_TSDF, gpu_voxel_grid_weight);
-  // }
 
   // Load TSDF voxel grid from GPU to CPU memory
   cudaMemcpy(voxel_grid_TSDF, gpu_voxel_grid_TSDF, voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z * sizeof(float), cudaMemcpyDeviceToHost);
